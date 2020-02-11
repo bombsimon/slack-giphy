@@ -1,9 +1,5 @@
-extern crate slack;
-use serde_yaml::Value;
 use slack::api::MessageStandard;
-use slack::{Event, Message, RtmClient};
-
-extern crate reqwest;
+use slack::{Event, EventHandler, Message, RtmClient};
 
 struct GiphyBot {
     channel_name: String,
@@ -13,7 +9,7 @@ struct GiphyBot {
 }
 
 #[allow(unused_variables)]
-impl slack::EventHandler for GiphyBot {
+impl EventHandler for GiphyBot {
     fn on_event(&mut self, cli: &RtmClient, event: Event) {
         match event {
             Event::Hello => {
@@ -72,7 +68,7 @@ fn get_giph(api_key: &str, tag: &str) -> Option<String> {
         tag = tag
     );
 
-    let result: Result<Value, reqwest::Error> =
+    let result: Result<serde_yaml::Value, reqwest::Error> =
         reqwest::get(&request_url).and_then(|mut response| response.json());
 
     match result {
