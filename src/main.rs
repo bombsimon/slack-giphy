@@ -2,34 +2,43 @@ use slack::api::MessageStandard;
 use slack::{Event, EventHandler, Message, RtmClient};
 
 struct GiphyBot {
-    channel_name: String,
-    channel_id: String,
+    /// GiphyBot is the bot that sends gifs to Slack based on configured keywords.
     giphy_api_key: String,
     giphy_keywords: Vec<String>,
 }
 
 #[allow(unused_variables)]
 impl EventHandler for GiphyBot {
+    /// Handles every `slack::Event` and takes appropreate action for each event.
+    ///
+    /// # Arguments
+    ///
+    /// * `cli` - The Slack RtmClient
+    ///
+    /// * `event` - The event from Slack
     fn on_event(&mut self, cli: &RtmClient, event: Event) {
         match event {
-            Event::Hello => {
-                let _ = cli
-                    .sender()
-                    .send_message(&self.channel_id, "Hello world! (rtm)");
-            }
             Event::Message(msg) => {
-                let text = match *msg {
-                    Message::Standard(MessageStandard { ref text, .. }) => text.as_ref().unwrap(),
-                    _ => "",
+                let (text, channel_id) = match *msg {
+                    Message::Standard(MessageStandard {
+                        ref text,
+                        ref channel,
+                        ..
+                    }) => (text.as_ref().unwrap(), channel.as_ref().unwrap()),
+                    _ => {
+                        println!("could not get text and channel");
+                        return;
+                    }
                 };
 
                 for tag in &self.giphy_keywords {
                     if text.to_lowercase().contains(tag) {
                         match get_giph(&self.giphy_api_key, tag) {
                             Some(giph) => {
-                                let _ = cli.sender().send_message(&self.channel_id, giph.as_str());
+                                let _ = cli.sender().send_message(&channel_id, giph.as_str());
+                                break;
                             }
-                            None => println!("could not get giph"),
+                            None => println!("could not get gif"),
                         }
                     }
                 }
@@ -38,29 +47,32 @@ impl EventHandler for GiphyBot {
         };
     }
 
+    /// Called when the Slack connection is shutting down.
+    ///
+    /// # Arguments
+    ///
+    /// * `cli` - The Slack RtmClient
     fn on_close(&mut self, cli: &RtmClient) {
         println!("on_close");
     }
 
+    /// Called when the Slack connection is established.
+    ///
+    /// # Arguments
+    ///
+    /// * `cli` - The Slack RtmClient
     fn on_connect(&mut self, cli: &RtmClient) {
-        let channel_id = cli
-            .start_response()
-            //.channels // Public chats, does not list private ones
-            .groups // Private chats, does not list public ones
-            .as_ref()
-            .and_then(|groups| {
-                groups.iter().find(|group| match group.name {
-                    None => false,
-                    Some(ref name) => *name == self.channel_name,
-                })
-            })
-            .and_then(|group| group.id.as_ref())
-            .expect("group not found");
-
-        self.channel_id = channel_id.to_string();
+        println!("connected");
     }
 }
 
+/// Returns an Option with Some(gif url) or None if an HTTP error occurs.
+///
+/// # Arguments
+///
+/// * `api_key` - The Giphy.com API key.
+///
+/// * `tag` - The tag to search for.
 fn get_giph(api_key: &str, tag: &str) -> Option<String> {
     let request_url = format!(
         "http://api.giphy.com/v1/gifs/random?api_key={api_key}&tag={tag}",
@@ -77,6 +89,7 @@ fn get_giph(api_key: &str, tag: &str) -> Option<String> {
     }
 }
 
+/// The main method will setup the Slack RtmClient and start listening on events.
 fn main() {
     let f = std::fs::File::open("config.yaml").unwrap();
     let config: serde_yaml::Value = serde_yaml::from_reader(f).unwrap();
@@ -87,8 +100,6 @@ fn main() {
     }
 
     let mut handler = GiphyBot {
-        channel_name: String::from(config["slack-channel"].as_str().unwrap()),
-        channel_id: String::from(""),
         giphy_api_key: String::from(config["giphy"].as_str().unwrap()),
         giphy_keywords: tags,
     };
