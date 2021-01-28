@@ -1,5 +1,5 @@
 [package]
-name = "datahax-slack"
+name = "slack-giphy"
 version = "0.1.0"
 authors = ["Simon Sawert <simon@sawert.se>"]
 edition = "2018"
