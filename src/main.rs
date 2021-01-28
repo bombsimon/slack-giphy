@@ -81,7 +81,7 @@ fn get_giph(api_key: &str, tag: &str) -> Option<String> {
     );
 
     let result: Result<serde_yaml::Value, reqwest::Error> =
-        reqwest::get(&request_url).and_then(|mut response| response.json());
+        reqwest::blocking::get(&request_url).and_then(|response| response.json());
 
     match result {
         Ok(v) => v["data"]["url"].as_str().and_then(|u| Some(u.to_string())),
